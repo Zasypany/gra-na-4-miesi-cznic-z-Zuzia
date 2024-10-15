@@ -1,0 +1,311 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { Heart, Key } from 'lucide-react'
+import Image from 'next/image'
+
+interface GameStep {
+  image: string
+  clickArea: {
+    x: number
+    y: number
+    radius: number
+  }
+}
+
+const gameSteps: GameStep[] = [
+  { image: '/images/image1.jpg', clickArea: { x: 2637, y: 3080, radius: 300 } },
+  { image: '/images/image2.jpg', clickArea: { x: 2169, y: 3206, radius: 300 } },
+  { image: '/images/image3.jpg', clickArea: { x: 171, y: 2540, radius: 300 } },
+  { image: '/images/image4.jpg', clickArea: { x: 1701, y: 320, radius: 300 } },
+  { image: '/images/image5.jpg', clickArea: { x: 2763, y: 1784, radius: 300 } },
+  { image: '/images/image6.jpg', clickArea: { x: 3321, y: 2906, radius: 300 } },
+  { image: '/images/image7.jpg', clickArea: { x: 2199, y: 2990, radius: 300 } },
+  { image: '/images/image8.jpg', clickArea: { x: 1641, y: 2216, radius: 300 } },
+  { image: '/images/image9.jpg', clickArea: { x: 1266, y: 3209, radius: 300 } },
+  { image: '/images/image10.jpg', clickArea: { x: 2673, y: 3146, radius: 300 } },
+  { image: '/images/final-image.jpg', clickArea: { x: 0, y: 0, radius: 0 } }
+]
+
+export default function AnniversaryLoveGame() {
+  const [currentStep, setCurrentStep] = useState(0)
+  const [gameCompleted, setGameCompleted] = useState(false)
+  const [showHeart, setShowHeart] = useState(false)
+  const [deviceType, setDeviceType] = useState<'mobile' | 'tablet' | 'desktop'>('desktop')
+  const [isClient, setIsClient] = useState(false)
+  const [showFinalImage, setShowFinalImage] = useState(false)
+  const [showFunFact, setShowFunFact] = useState(false)
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
+  const [isUnlocked, setIsUnlocked] = useState(false)
+  const [unlockCode, setUnlockCode] = useState('')
+  const celebrationAudioRef = useRef<HTMLAudioElement | null>(null)
+  const gameCompleteAudioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    setIsClient(true)
+    const detectDevice = () => {
+      const ua = navigator.userAgent
+      if (/iPhone|Android/.test(ua) && !/iPad|Tablet/.test(ua)) {
+        setDeviceType('mobile')
+      } else if (/iPad|Tablet/.test(ua)) {
+        setDeviceType('tablet')
+      } else {
+        setDeviceType('desktop')
+      }
+    }
+
+    detectDevice()
+    window.addEventListener('resize', detectDevice)
+
+    celebrationAudioRef.current = new Audio('/celebration.mp3')
+    gameCompleteAudioRef.current = new Audio('/game_complete.mp3')
+
+    const targetDate = new Date('2023-10-25T00:00:00+08:00')
+    const updateCountdown = () => {
+      const now = new Date()
+      const difference = targetDate.getTime() - now.getTime()
+      if (difference > 0) {
+        setTimeRemaining(Math.floor(difference / 1000))
+      } else {
+        setTimeRemaining(0)
+        setIsUnlocked(true)
+      }
+    }
+
+    updateCountdown()
+    const intervalId = setInterval(updateCountdown, 1000)
+
+    return () => {
+      window.removeEventListener('resize', detectDevice)
+      if (celebrationAudioRef.current) {
+        celebrationAudioRef.current.pause()
+        celebrationAudioRef.current = null
+      }
+      if (gameCompleteAudioRef.current) {
+        gameCompleteAudioRef.current.pause()
+        gameCompleteAudioRef.current = null
+      }
+      clearInterval(intervalId)
+    }
+  }, [])
+
+  const playCelebrationSound = () => {
+    if (celebrationAudioRef.current) {
+      celebrationAudioRef.current.currentTime = 0
+      celebrationAudioRef.current.play().catch(e => console.error("Error playing celebration audio:", e))
+    }
+  }
+
+  const playGameCompleteSound = () => {
+    if (gameCompleteAudioRef.current) {
+      gameCompleteAudioRef.current.currentTime = 0
+      gameCompleteAudioRef.current.play().catch(e => console.error("Error playing game complete audio:", e))
+    }
+  }
+
+  const handleImageInteraction = (event: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const rect = event.currentTarget.getBoundingClientRect()
+    const clientX = 'touches' in event ? event.touches[0].clientX : event.clientX
+    const clientY = 'touches' in event ? event.touches[0].clientY : event.clientY
+    
+    const naturalWidth = 3456
+    const naturalHeight = 4608
+
+    const scaleX = naturalWidth / rect.width
+    const scaleY = naturalHeight / rect.height
+
+    const x = (clientX - rect.left) * scaleX
+    const y = (clientY - rect.top) * scaleY
+
+    const { clickArea } = gameSteps[currentStep]
+    const distance = Math.sqrt(Math.pow(x - clickArea.x, 2) + Math.pow(y - clickArea.y, 2))
+
+    console.log(`Clicked at (${x.toFixed(2)}, ${y.toFixed(2)}), distance: ${distance.toFixed(2)}, radius: ${clickArea.radius}`)
+
+    if (distance <= clickArea.radius) {
+      setShowHeart(true)
+      setTimeout(() => setShowHeart(false), 1000)
+      playCelebrationSound()
+
+      if (currentStep === gameSteps.length - 2) {
+        setGameCompleted(true)
+        playGameCompleteSound()
+      } else {
+        setCurrentStep(currentStep + 1)
+      }
+    }
+  }
+
+  const handleFinalHeartClick = () => {
+    setShowFinalImage(true)
+    setShowFunFact(true)
+    playGameCompleteSound()
+  }
+
+  const handleUnlock = () => {
+    if (unlockCode === '6941') {
+      setIsUnlocked(true)
+    } else {
+      alert('Incorrect code. Please try again.')
+    }
+  }
+
+  if (!isClient) {
+    return null; // or a loading spinner
+  }
+
+  if (!isUnlocked && timeRemaining !== null && timeRemaining > 0) {
+    const days = Math.floor(timeRemaining / (24 * 60 * 60))
+    const hours = Math.floor((timeRemaining % (24 * 60 * 60)) / (60 * 60))
+    const minutes = Math.floor((timeRemaining % (60 * 60)) / 60)
+    const seconds = timeRemaining % 60
+
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-pink-100 p-4">
+        <h1 className="text-3xl font-bold text-pink-600 mb-4">Anniversary Love Game</h1>
+        <p className="text-xl text-gray-800 mb-4">The game will unlock in:</p>
+        <div className="text-4xl font-bold text-pink-600 mb-8">
+          {days}d {hours}h {minutes}m {seconds}s
+        </div>
+        <div className="flex items-center mb-4">
+          <input
+            type="password"
+            value={unlockCode}
+            onChange={(e) => setUnlockCode(e.target.value)}
+            placeholder="Enter unlock code"
+            className="border-2 border-pink-300 rounded px-3 py-2 mr-2"
+          />
+          <button
+            onClick={handleUnlock}
+            className="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600"
+          >
+            <Key size={20} />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (gameCompleted) {
+    return (
+      <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-pink-100 to-pink-200 p-4 overflow-y-auto">
+        <div className="flex flex-col md:flex-row items-start justify-center w-full max-w-6xl gap-4">
+          <div className="relative w-full md:w-1/3 mb-4 md:mb-0 sticky top-4" onClick={handleFinalHeartClick}>
+            {!showFinalImage ? (
+              <div className="relative w-full aspect-[3/4] flex items-center justify-center bg-pink-300 rounded-lg shadow-lg">
+                <Heart
+                  fill="pink"
+                  size={192}
+                  className="transition-all duration-500 ease-in-out"
+                />
+                <span className="absolute text-white text-lg font-bold text-center">
+                  Click me!
+                </span>
+              </div>
+            ) : (
+              <div className="relative w-full" style={{ height: 'calc(100vh - 2rem)' }}>
+                <Image
+                  src={gameSteps[gameSteps.length - 1].image}
+                  alt="Final Anniversary Image"
+                  layout="fill"
+                  objectFit="cover"
+                  className="rounded-lg shadow-lg transition-all duration-500 ease-in-out"
+                />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 md:w-2/3">
+            <h2 className="text-2xl md:text-3xl font-bold text-pink-600 text-center md:text-left font-serif mb-4">
+              Szczęśliwej 4 miesięcznicy, kochanie!
+            </h2>
+            <div className="bg-white bg-opacity-80 p-4 rounded-lg shadow-lg mb-4">
+              <p className="text-sm md:text-base text-gray-800 leading-relaxed space-y-2">
+                <span className="block">
+                  Cztery miesiące temu rozpoczęliśmy naszą wspólną podróż (co najśmieszniejsze, poznaliśmy się na Tinderze – to historia, którą z pewnością opowiemy naszym przyszłym dzieciom). Od tamtej pory moje życie nabrało nowego, pięknego wymiaru i sensu. Kiedy patrzę wstecz na te dni, uświadamiam sobie, jak wielkim darem jest Twoja obecność. Na pewno nie rozwinąłbym się tak bez Ciebie, Zuzia.
+                </span>
+                <span className="block">
+                  Z każdym wspólnym śmiechem, każdą rozmową i każdą chwilą spędzoną razem, czuję, jak moja miłość do Ciebie rośnie. Widzę też, jak Ty się rozwijasz – nie tylko w naszym związku (widzę, jak rozwijasz swoją inteligencję emocjonalną, jak pokazujesz mi swoją miłość, co jest najpiękniejszą rzeczą na świecie), ale także jako osoba. Wiem, że będziesz cudowną mamą dla naszych dzieci.
+                </span>
+                <span className="block">
+                  Nie tylko znalazłem w Tobie osobę, która rozumie moje myśli i emocje, ale też prawdziwego partnera, z którym chcę spędzić resztę życia. Każdy dzień z Tobą utwierdza mnie w przekonaniu, że jesteśmy stworzeni dla siebie. Nie jestem w stanie wyobrazić sobie życia bez Ciebie, Zuzia. Chcę być częścią Twojej rodziny, tak jak pragnę, żebyś Ty była częścią mojej.
+                </span>
+                <span className="block">
+                  Dziękuję, że jesteś moją podporą, moim źródłem radości i miłości. Zuzia, jesteś dla mnie wszystkim, co najpiękniejsze. Z niecierpliwością czekam na wszystkie kolejne miesiące, lata, a nawet na całe życie, które spędzimy razem. Jesteś dla mnie wszystkim i jeśli bym musiał, oddałbym wszystko, żeby spędzić z Tobą choćby chwilę dłużej. Kocham Cię, Zuzia. Jesteś najlepsza! :))
+                </span>
+              </p>
+            </div>
+            {showFunFact && (
+              <div className="flex flex-col gap-4">
+                <div className="bg-white bg-opacity-80 p-4 rounded-lg shadow-lg">
+                  <h3 className="text-lg font-bold text-pink-600 mb-2">Ciekawostka:</h3>
+                  <p className="text-xs md:text-sm text-gray-800">
+                    Zrobienie tej aplikacji zajęło mi prawie 100 godzin. Musiałem nauczyć się obsługi Photoshopa oraz dowiedzieć się, jak dodać najpiękniejszą figurkę LEGO do zdjęć z Nowego Jorku, które zrobiłem aparatem. Cały projekt pochłonął około 150 godzin pracy, ale szczerze? Było warto. Nie ma rzeczy, której bym nie zrobił dla Ciebie, kochanie. Nauczyłbym się wszystkiego, żeby zobaczyć Twój uśmiech.
+                  </p>
+                </div>
+                <div className="bg-gray-800 p-4 rounded-lg shadow-lg">
+                  <h3 className="text-lg font-bold text-pink-400 mb-2">Fragment przykładowego kodu:</h3>
+                  <pre className="text-xs text-gray-300 overflow-x-auto">
+                    <code>
+    {`const handleImageInteraction = (event) => {
+      const rect = event.currentTarget.getBoundingClientRect()
+      const x = (clientX - rect.left) * (naturalWidth / rect.width)
+      const y = (clientY - rect.top) * (naturalHeight / rect.height)
+      
+      const { clickArea } = gameSteps[currentStep]
+      const distance = Math.sqrt(Math.pow(x - clickArea.x, 2) + Math.pow(y - clickArea.y, 2))
+
+      if (distance <= clickArea.radius) {
+        // Correct area clicked!
+        setShowHeart(true)
+        playCelebrationSound()
+        setCurrentStep(currentStep + 1)
+      }
+    }`}
+                    </code>
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-pink-50 p-4">
+      <div className="relative w-full max-w-md" onClick={handleImageInteraction} onTouchStart={handleImageInteraction}>
+        <Image
+          src={gameSteps[currentStep].image}
+          alt={`Krok ${currentStep + 1}`}
+          width={3456}
+          height={4608}
+          className="cursor-pointer rounded-lg shadow-lg w-full h-auto"
+        />
+        {showHeart && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Heart className="text-pink-500 animate-ping" size={deviceType === 'mobile' ? 50 : 100} />
+          </div>
+        )}
+      </div>
+      <div className="mt-4 text-center">
+        <p className={`font-semibold text-pink-700 ${deviceType === 'mobile' ? 'text-sm' : 'text-lg'}`}>
+          Znajdź swoją figurkę LEGO którą ukryłem na obrazku (Krok {currentStep + 1} z {gameSteps.length - 1})
+        </p>
+      </div>
+      <div className={`mt-4 flex flex-wrap justify-center gap-2 ${deviceType === 'mobile' ? 'max-w-xs' : 'max-w-2xl'}`}>
+        {Array.from({ length: gameSteps.length - 1 }).map((_, index) => (
+          <Heart
+            key={index}
+            className={`${
+              index < currentStep ? 'text-pink-500' : 'text-pink-200'
+            } transition-colors duration-300`}
+            size={deviceType === 'mobile' ? 16 : 20}
+            fill={index < currentStep ? 'currentColor' : 'none'}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
